@@ -46,9 +46,10 @@ shinyUI(fluidPage(
                    value = 1,
                    min = 1),
       
-      column(4,uiOutput("ui_modelnames")),
-      column(4,uiOutput("ui_modelformulas")),
-      column(4,uiOutput("ui_modelweights")),
+      column(3,uiOutput("ui_modelnames")),
+      column(3,uiOutput("ui_modelformulas")),
+      column(3,uiOutput("ui_modelweights")),
+      column(3,uiOutput("ui_modeltypes")),
       
       hr(),
       
@@ -78,9 +79,9 @@ shinyUI(fluidPage(
              tags$div(title = "Block the survey into a number of different surveys. This is useful if you need a large number of different questions that exceeds the number of questions that can be reliably answered by a single respondant.",
                       numericInput(inputId = "blocks", label = "Number of Different Surveys", value = 1, min = 1)),
            
-             #Specify model search procedure. Add Gibbs later once it has been implemented
-             tags$div(title = "The model searching strategy. Fedorov may take longer than Gibbs for a large number of variables but typically finds more efficient designs.",
-                      selectInput(inputId = "searchstrat", label = "Model Searching Strategy", choices = c("Federov", "Gibbs"), selected = "Federov")),
+             #Specify model search procedure.
+             tags$div(title = "The model searching strategy. Fedorov may take longer than columnwise for a large number of variables but typically finds more efficient designs.",
+                      selectInput(inputId = "searchstrat", label = "Model Searching Strategy", choices = c("Fedorov", "Columnwise"), selected = "Fedorov")),
              
              #Specify number of random starts
              tags$div(title = "Increasing the number of random starts helps the optimizer avoid local minima and maxima.",
@@ -165,7 +166,7 @@ tags$div(title = "Block the survey into a number of different surveys. This is u
              
              #Specify model search procedure. Add Gibbs later once it has been implemented
 tags$div(title = "The model searching strategy. Fedorov may take longer than Gibbs for a large number of variables but typically finds more efficient designs.",
-         selectInput(inputId = "searchstratmulti", label = "Model Searching Strategy", choices = c("Federov", "Gibbs"), selected = "Federov")),
+         selectInput(inputId = "searchstratmulti", label = "Model Searching Strategy", choices = c("Fedorov", "Columnwise"), selected = "Fedorov")),
              
              #Specify number of random starts
 tags$div(title = "Increasing the number of random starts helps the optimizer avoid local minima and maxima.",

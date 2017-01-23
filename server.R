@@ -125,6 +125,14 @@ shinyServer(function(input, output) {
     })
   })
   
+  #Generate a drop-down selector for each variable in input$varnums
+  output$ui_modeltypes <- renderUI({
+    modelnums <- as.integer(input$modelnums)
+    lapply(1:modelnums, function(i) {
+      selectInput(inputId = paste0("modeltype", i), label = paste0("Model ", i, ", Type:"), choices = c("Linear", "Choice"))
+    })
+  })
+  
   #Collect user generated model effects
   output$ui_modeleffects <- renderUI({
     
@@ -223,8 +231,8 @@ shinyServer(function(input, output) {
     
     #Pull effects list from factorgen reactive function and use as correlation matrix names
     effectlist <- factorgen()[["effectlist"]][[as.numeric(input$corrmodel)]]
-    colnames(corrmat) <- effectlist
-    rownames(corrmat) <- effectlist
+    colnames(corrmat)[(ncol(corrmat)-length(effectlist)+1):ncol(corrmat)] <- effectlist
+    rownames(corrmat)[(nrow(corrmat)-length(effectlist)+1):nrow(corrmat)] <- effectlist
     
     #Set column names and row names based on factor names equal to row names
     #colnames(corrmat) <- rownames(corrmat)
@@ -511,6 +519,12 @@ shinyServer(function(input, output) {
     #Collect input formula weights
     weightvect <- as.numeric(sapply(grep("modelweight", names(input), value = TRUE), function(i){input[[i]]}))
     
+    #Get vector of formula types
+    formulatypes <- sapply(paste0("modeltype", seq(from = 1, to = input$modelnums)), function(i) {
+      
+      paste0(input[[i]])
+    })
+    
     priorlist <- list()
     #Collect prior weights
     for(i in 1:length(formulalist)){
@@ -570,7 +584,7 @@ shinyServer(function(input, output) {
       
     }
     
-    return(list("inputrange" = inputrange, "formulalist" = formulalist, "formulanames" = formulanames, "priorlist" = priorlist, "powerdifflist" = powerdifflist, "weightvect" = weightvect, "varlevs" = varlevs))
+    return(list("inputrange" = inputrange, "formulalist" = formulalist, "formulanames" = formulanames, "priorlist" = priorlist, "powerdifflist" = powerdifflist, "weightvect" = weightvect,"formulatypes" = formulatypes, "varlevs" = varlevs))
     
   })
   
@@ -596,8 +610,8 @@ shinyServer(function(input, output) {
       #Create placeholder list of determinants
       determrefs <- rep(1, length(modelprep$formulalist))
       
-      #Federov-specific implementation details
-      if(input$searchstrat == "Federov"){candset <- expand.grid(modelprep$varlevs)}else{candset <- NA}
+      #Fedorov-specific implementation details
+      if(input$searchstrat == "Fedorov"){candset <- expand.grid(modelprep$varlevs)}else{candset <- NA}
         #Run through each base variable and expand the model matrix base
         
         #Create stacked diagonals matrix for a few random starts to find baseline d-efficiency values to use
@@ -605,21 +619,37 @@ shinyServer(function(input, output) {
                             ncol = length(modelprep$weightvect),
                             data = c(diag(length(modelprep$weightvect))),
                             byrow = TRUE)
-        
         #Initial pass through model focusing on one formula only each time to establish optimal d-efficiencies
-        optmodel <- apply(randommat, MARGIN = 1, DiscChoiceMultipleModel,
-                           base_input_range = modelprep$inputrange,
-                           formulalist = modelprep$formulalist,
-                           questions = input$modelquestions,
-                           alts = input$alternatives,
-                           blocks = input$blocks,
-                           optout = input$optout,
-                           det_ref_list = determrefs,
-                           candset = candset,
-                           priors = modelprep$priorlist,
-                           mesh = modelprep$varlevs,
-                           tolerance = input$tolerancebaseline,
-                           searchstyle = input$searchstrat)
+        optmodel <- apply(randommat, MARGIN = 1, MultipleModelOptimize,
+                          base_input_range = modelprep$inputrange,
+                          formulalist = modelprep$formulalist,
+                          questions = input$modelquestions,
+                          alts = input$alternatives,
+                          blocks = input$blocks,
+                          optout = input$optout,
+                          det_ref_list = determrefs,
+                          candset = candset,
+                          priors = modelprep$priorlist,
+                          mesh = modelprep$varlevs,
+                          tolerance = input$tolerancebaseline,
+                          searchstyle = input$searchstrat,
+                          eqtype = modelprep$formulatypes)
+#         #########Old code###
+#         #Initial pass through model focusing on one formula only each time to establish optimal d-efficiencies
+#         optmodel <- apply(randommat, MARGIN = 1, DiscChoiceMultipleModel,
+#                            base_input_range = modelprep$inputrange,
+#                            formulalist = modelprep$formulalist,
+#                            questions = input$modelquestions,
+#                            alts = input$alternatives,
+#                            blocks = input$blocks,
+#                            optout = input$optout,
+#                            det_ref_list = determrefs,
+#                            candset = candset,
+#                            priors = modelprep$priorlist,
+#                            mesh = modelprep$varlevs,
+#                            tolerance = input$tolerancebaseline,
+#                            searchstyle = input$searchstrat)
+#         ########Old code######
         
         #Find maximum d-efficiencies to use as reference designs
         if(length(modelprep$formulalist) > 1){
@@ -636,7 +666,7 @@ shinyServer(function(input, output) {
         weight <- matrix(nrow = input$randomstarts, ncol = length(modelprep$weightvect), data = modelprep$weightvect, byrow = TRUE)
         
         #Full optimization pass using optimal d-efficiencies
-        optmodel <- apply(weight, MARGIN = 1, DiscChoiceMultipleModel,
+        optmodel <- apply(weight, MARGIN = 1, MultipleModelOptimize,
                           base_input_range = modelprep$inputrange,
                           formulalist = modelprep$formulalist,
                           questions = input$modelquestions,
@@ -648,7 +678,8 @@ shinyServer(function(input, output) {
                           priors = modelprep$priorlist,
                           mesh = modelprep$varlevs,
                           tolerance = input$tolerance,
-                          searchstyle = input$searchstrat)
+                          searchstyle = input$searchstrat,
+                          eqtype = modelprep$formulatypes)
         
         #Select best model
         optmodel <- optmodel[[which.max(sapply(optmodel, "[[", "ObjectiveFunction"))]]
@@ -702,8 +733,8 @@ shinyServer(function(input, output) {
         
         modellist <- list()
         
-        #Federov-specific implementation details
-        if(input$searchstratmulti == "Federov"){candset <- expand.grid(modelprep$varlevs)}else{candset <- NA}
+        #Fedorov-specific implementation details
+        if(input$searchstratmulti == "Fedorov"){candset <- expand.grid(modelprep$varlevs)}else{candset <- NA}
         
         for(i in 1:nrow(searchparams)){
         
@@ -717,7 +748,7 @@ shinyServer(function(input, output) {
                               byrow = TRUE)
           
           #Initial pass through model focusing on one formula only each time to establish optimal d-efficiencies
-          optmodel <- try(apply(randommat, MARGIN = 1, DiscChoiceMultipleModel,
+          optmodel <- try(apply(randommat, MARGIN = 1, MultipleModelOptimize,
                             base_input_range = modelprep$inputrange,
                             formulalist = modelprep$formulalist,
                             questions = searchparams$questions[i],
@@ -729,7 +760,8 @@ shinyServer(function(input, output) {
                             priors = modelprep$priorlist,
                             mesh = modelprep$varlevs,
                             tolerance = input$tolerancebaseline,
-                            searchstyle = input$searchstratmulti))
+                            searchstyle = input$searchstratmulti,
+                            eqtype = modelprep$formulatypes))
           
           #Find maximum d-efficiencies to use as reference designs
           if(length(modelprep$formulalist) > 1){
@@ -746,7 +778,7 @@ shinyServer(function(input, output) {
           weight <- matrix(nrow = input$randomstartsmulti, ncol = length(modelprep$weightvect), data = modelprep$weightvect, byrow = TRUE)
           
           #Full optimization pass using optimal d-efficiencies
-          optmodel <- try(apply(weight, MARGIN = 1, DiscChoiceMultipleModel,
+          optmodel <- try(apply(weight, MARGIN = 1, MultipleModelOptimize,
                             base_input_range = modelprep$inputrange,
                             formulalist = modelprep$formulalist,
                             questions = searchparams$questions[i],
@@ -758,7 +790,8 @@ shinyServer(function(input, output) {
                             priors = modelprep$priorlist,
                             mesh = modelprep$varlevs,
                             tolerance = input$tolerance,
-                            searchstyle = input$searchstratmulti))
+                            searchstyle = input$searchstratmulti,
+                            eqtype = modelprep$formulatypes))
           
           #Select best model
           optmodel <- optmodel[[which.max(sapply(optmodel, "[[", "ObjectiveFunction"))]]
@@ -802,8 +835,11 @@ shinyServer(function(input, output) {
       #Get covariance matrix for only one model
       covlist <- modelout$CovList[[i]]
       
-      #Calculate sample sizes based on supplied power values
-      samplesizeframelist[[i]] <- vcovpower(vcovmat = covlist, detectdiff = modelprep$powerdifflist[[i]])
+      #Non intercept row and column ids
+      nonintids <- (rownames(covlist) != "(Intercept)")
+      
+      #Calculate sample sizes based on supplied power values (ignore intercept for these calculations)
+      samplesizeframelist[[i]] <- vcovpower(vcovmat = covlist[nonintids, nonintids], detectdiff = modelprep$powerdifflist[[i]])
       
       #Translate covariance matrix to correlation matrix
       corrframelist[[i]] <- cov2cor(covlist)
@@ -833,11 +869,14 @@ corrframes <- reactive({
     covlist <- lapply(modelout$CovLists, "[", i)
     covlist <- unlist(covlist, recursive = FALSE)
     
+    #Remove intercept for power calcs
+    covpower <- lapply(covlist, function(x) x[which(rownames(x) != "(Intercept)"),which(rownames(x) != "(Intercept)")])
+    
     #Calculate power for each covariance matrix
     samplesizeframe <- data.frame(modelout$DesignParamFrame)
       
       #Calculate sample sizes based on supplied power values
-      samplesizeframe[rownames(covlist[[1]])] <- t(data.frame(sapply(lapply(covlist, vcovpower, detectdiff = modelprep$powerdifflist[[i]]), "[", "Minimum Sample Size")))
+      samplesizeframe[rownames(covpower[[1]])] <- t(data.frame(sapply(lapply(covpower, vcovpower, detectdiff = modelprep$powerdifflist[[i]]), "[", "Minimum Sample Size")))
       
     
   #Translate covariance matrix to correlation matrix
