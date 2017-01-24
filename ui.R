@@ -18,7 +18,7 @@ shinyUI(fluidPage(
   useShinyjs(),
 
   # Application title
-  titlePanel("Discrete Choice Experiment Planner"),
+  titlePanel("Multiple Model Optimizer"),
     # Show a plot of the generated distribution
   tabsetPanel(  
   tabPanel("Design Basics",
@@ -52,6 +52,9 @@ shinyUI(fluidPage(
       column(3,uiOutput("ui_modeltypes")),
       
       hr(),
+      hr(),
+      
+      h3("Advanced Options (May Leave Unchanged)"),
       
       h3("Estimate Effect Size for Each Model"),
       
@@ -67,17 +70,8 @@ shinyUI(fluidPage(
              h3("Basic Model Creation"),
              
              #Specify the number of model points
-             numericInput(inputId = "modelquestions", label = "Number of Questions Per Survey", value = 1, min = 1),
+             numericInput(inputId = "modelquestions", label = "Number of Design Points", value = 1, min = 1),
              
-             #Specify the number of alternatives per question
-             numericInput(inputId = "alternatives", label = "Number of Choices Per Question", value = 2, min = 1),
-             
-             #Specify whether an opt-out should be included
-             checkboxInput(inputId = "optout", label = "Include Opt-Out Alternative (i.e. 'None of the Above')", value = FALSE),
-             
-             #Specify number of blocks
-             tags$div(title = "Block the survey into a number of different surveys. This is useful if you need a large number of different questions that exceeds the number of questions that can be reliably answered by a single respondant.",
-                      numericInput(inputId = "blocks", label = "Number of Different Surveys", value = 1, min = 1)),
            
              #Specify model search procedure.
              tags$div(title = "The model searching strategy. Fedorov may take longer than columnwise for a large number of variables but typically finds more efficient designs.",
@@ -91,9 +85,20 @@ shinyUI(fluidPage(
              actionButton(inputId = "createsingledesignbutton", label = "Create Design"),
              
              
-
+             
              #Options for Advanced Model Creation
              h3("Advanced Options (May Leave Unchanged)"),
+
+             #Specify number of blocks
+             tags$div(title = "Number of Design Blocks",
+                      numericInput(inputId = "blocks", label = "Number of Blocks", value = 1, min = 1)),
+             
+                          
+             #Specify the number of alternatives per question
+             numericInput(inputId = "alternatives", label = "Number of Choices Per Question", value = 1, min = 1),
+             
+             #Specify whether an opt-out should be included
+             checkboxInput(inputId = "optout", label = "Include Opt-Out Alternative (i.e. 'None of the Above')", value = FALSE),
              
              #Specify number of random starts
              numericInput(inputId = "randomstartsbaseline", label = "Number of Random Starts to find Optimal Reference Designs", value = 3, min = 1),
@@ -111,18 +116,25 @@ shinyUI(fluidPage(
              
              
              
+
+             #Display model efficiencies
+             hr(),
+             h3("Model Diagnostics and Efficiencies"),
+             textOutput("out_diagnostics"),
+             tableOutput("out_formuladetails"),
+             
+             #Download button for the model
+             tags$div(title = "Save model matrix as csv file",
+                      textInput("ModelSaveName","File Name For Model Matrix:",value="ModelSaveName")),
+             tags$div(title = "Save model matrix as csv file",
+                      downloadButton("ModelSave","Download Model Matrix")),
+             
              #Display correlation plot selector of variables for each model
              tags$div(title = "Select the formula to show the corresponding correlation plot for the predictor variables. Correlations closer to 0 are better.",
                       uiOutput("ui_corrplotselect")),
              
              #Display correlation plot
              plotOutput("out_corrplot"),
-             
-             #Display model efficiencies
-             hr(),
-             h3("Model Diagnostics and Efficiencies"),
-             textOutput("out_diagnostics"),
-             tableOutput("out_formuladetails"),
              
              #Display power and sample size table
              hr(),
@@ -132,10 +144,6 @@ shinyUI(fluidPage(
              
              #Display final model matrix
              hr(),
-             tags$div(title = "Save model matrix as csv file",
-                      textInput("ModelSaveName","File Name For Model Matrix:",value="ModelSaveName")),
-             tags$div(title = "Save model matrix as csv file",
-                      downloadButton("ModelSave","Download Model Matrix")),
              tags$div(title = "This table shows the final survey design to use. Question number is shown in the first column. Randomization of question order when administering the survey is typically recommended.",
                       h3("Design Matrix")),
              tableOutput("out_modelmatrix")
